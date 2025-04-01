@@ -415,6 +415,16 @@ function unhideAllMessages() {
         console.log(`[${extensionName}] Unhide all: No hidden messages found.`);
     }
     
+    // 重要修改：重置隐藏设置为0，并更新UI
+    saveCurrentHideSettings(0);
+    updateCurrentHideSettingsDisplay();
+    
+    // 更新输入框显示
+    const hideLastNInput = document.getElementById('hide-last-n');
+    if (hideLastNInput) {
+        hideLastNInput.value = '';
+    }
+    
     console.log(`[${extensionName}] Unhide all completed in ${performance.now() - startTime}ms`);
 }
 
@@ -449,12 +459,6 @@ function setupEventListeners() {
     const unhideAllButton = document.getElementById('hide-unhide-all-btn');
     if (unhideAllButton) {
         unhideAllButton.addEventListener('click', () => {
-            // 点击取消隐藏按钮时，设置userConfigured标志
-            const settings = getCurrentHideSettings() || { hideLastN: 0, lastProcessedLength: 0 };
-            if (!settings.userConfigured) {
-                saveCurrentHideSettings(settings.hideLastN || 0);
-            }
-            
             unhideAllMessages();
             toastr.success('已取消所有消息的隐藏');
         });
