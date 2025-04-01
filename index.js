@@ -99,6 +99,8 @@ function saveCurrentHideSettings(hideLastN) {
     // 保存设置
     target.data.hideHelperSettings.hideLastN = hideLastN;
     target.data.hideHelperSettings.lastProcessedLength = context.chat?.length || 0;
+    // 添加一个标志，表示用户已明确设置过隐藏规则
+    target.data.hideHelperSettings.userConfigured = true;
     return true;
 }
 
@@ -129,10 +131,27 @@ function debounce(fn, delay) {
 const runFullHideCheckDebounced = debounce(runFullHideCheck, 200);
 
 /**
+ * 检查是否应该执行隐藏/取消隐藏操作
+ * 只有当用户明确设置过隐藏规则时才返回true
+ */
+function shouldProcessHiding() {
+    const settings = getCurrentHideSettings();
+    // 如果没有设置，或者用户没有明确配置过，则不处理
+    if (!settings || settings.userConfigured !== true) {
+        console.log(`[${extensionName}] Skipping hide processing: No user-configured settings found.`);
+        return false;
+    }
+    return true;
+}
+
+/**
  * 增量隐藏检查 (用于新消息到达)
  * 仅处理从上次处理长度到现在新增的、需要隐藏的消息
  */
 function runIncrementalHideCheck() {
+    // 首先检查是否应该执行隐藏操作
+    if (!shouldProcessHiding()) return;
+
     const startTime = performance.now();
     const context = getContextOptimized();
     const chat = context.chat;
@@ -221,6 +240,9 @@ function runIncrementalHideCheck() {
  * 用于加载、切换、删除、设置更改等情况
  */
 function runFullHideCheck() {
+    // 首先检查是否应该执行隐藏操作
+    if (!shouldProcessHiding()) return;
+
     const startTime = performance.now();
     console.log(`[${extensionName}] Running optimized full hide check.`);
     const context = getContextOptimized();
@@ -427,6 +449,12 @@ function setupEventListeners() {
     const unhideAllButton = document.getElementById('hide-unhide-all-btn');
     if (unhideAllButton) {
         unhideAllButton.addEventListener('click', () => {
+            // 点击取消隐藏按钮时，设置userConfigured标志
+            const settings = getCurrentHideSettings() || { hideLastN: 0, lastProcessedLength: 0 };
+            if (!settings.userConfigured) {
+                saveCurrentHideSettings(settings.hideLastN || 0);
+            }
+            
             unhideAllMessages();
             toastr.success('已取消所有消息的隐藏');
         });
@@ -479,7 +507,7 @@ jQuery(async () => {
             hideLastNInput.value = currentSettings?.hideLastN || '';
         }
         updateCurrentHideSettingsDisplay();
-        // 初始加载时执行全量检查
+        // 初始加载时执行全量检查，但只有在用户已配置过设置时才执行
         runFullHideCheck();
     }, 1000);
 });
